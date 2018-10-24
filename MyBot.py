@@ -54,7 +54,7 @@ while True:
     for ship in me.get_ships():
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
         #   Else, collect halite.
-        if ship.id not in ship_status.keys():
+        if ship.id not in ship_status.keys() or ship.position == me.shipyard.position:
             ship_status[ship.id] = "exploring" 
 
         if ship.is_full:
@@ -67,7 +67,13 @@ while True:
 
         for i, direction in enumerate(directions):
             position_dict[direction] = position_options[i]
-            halite_amounts.append(game_map[position_options[i]].halite_amount)
+            if game_map[position_options[i]].is_occupied:
+                if i == 4:
+                    halite_amounts.append(game_map[position_options[i]].halite_amount)
+                    continue
+                halite_amounts.append(0)
+            else:
+                halite_amounts.append(game_map[position_options[i]].halite_amount)
         
         halite_amounts = np.array(halite_amounts)
         halite_amounts = halite_amounts/np.sum(halite_amounts)
@@ -76,19 +82,11 @@ while True:
 
         if ship_status[ship.id] == "exploring":
             if game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full:
-                command_queue.append(ship.move(directions[choice(5, 1, halite_amounts)[0]]))
+                command_queue.append(ship.move(directions[choice(4, 1, halite_amounts)[0]]))
             else:
                 command_queue.append(ship.stay_still())
         elif ship_status[ship.id] == "returning":
-            if me.shipyard.position.x < ship.position.x:
-                dir = Direction.West
-            elif me.shipyard.position.x > ship.position.x:
-                dir = Direction.East
-            elif me.shipyard.position.y < ship.position.y:
-                dir = Direction.North
-            elif me.shipyard.position.y > ship.position.y:
-                dir = Direction.South
-            command_queue.append(ship.move(dir))
+            command_queue.append(ship.move(game_map.naive_navigate(ship, me.shipyard.position)))
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
