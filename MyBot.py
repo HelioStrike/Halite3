@@ -50,6 +50,7 @@ while True:
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
     command_queue = []
+    ship_positions = []
 
     for ship in me.get_ships():
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
@@ -62,16 +63,11 @@ while True:
 
         position_options = ship.position.get_surrounding_cardinals() + [ship.position]
 
-        position_dict = {}
         halite_amounts = []
 
         for i, direction in enumerate(directions):
-            position_dict[direction] = position_options[i]
             if game_map[position_options[i]].is_occupied:
-                if i == 4:
-                    halite_amounts.append(game_map[position_options[i]].halite_amount)
-                    continue
-                halite_amounts.append(0)
+                ship_positions.append(position_options[i])
             else:
                 halite_amounts.append(game_map[position_options[i]].halite_amount)
         
@@ -82,7 +78,13 @@ while True:
 
         if ship_status[ship.id] == "exploring":
             if game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full:
-                command_queue.append(ship.move(directions[choice(4, 1, halite_amounts)[0]]))
+                for p in range(4):
+                    next_choice = choice(5, 1, halite_amounts)[0]
+                    next_position = position_options[next_choice]
+                    if next_position not in ship_positions:
+                        ship_positions.append(next_position)
+                        command_queue.append(ship.move(directions[next_choice]))
+                        break    
             else:
                 command_queue.append(ship.stay_still())
         elif ship_status[ship.id] == "returning":
