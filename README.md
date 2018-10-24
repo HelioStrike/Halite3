@@ -1,1 +1,1 @@
-#Halite 3 Bot
+##Rule-based Halite 3 Bot
