@@ -27,7 +27,7 @@ game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 # As soon as you call "ready" function below, the 2 second per turn timer will start.
-game.ready("MyPythonBot")
+game.ready("GreedyBoi")
 
 # Now that your bot is initialized, save a message to yourself in the log file with some important information.
 #   Here, you log here your id, which you can always fetch from the game object by using my_id.
@@ -38,14 +38,40 @@ directions = [Direction.North, Direction.South, Direction.East, Direction.West, 
 #stores harvestable(is that a word?) points
 meat_points = []
 
+taken = []
+
 game_map = game.game_map
 
+meat_factor = 3
+
 #storing meat points
-for x in range(game_map.height):
-    for y in range(game_map.height):
-        pos = Position(x, y)
-        if game_map[pos].halite_amount > constants.MAX_HALITE/5:
-            meat_points.append(pos)
+def getMeatPoints():
+    global meat_points
+    meat_points = []
+    for x in range(game_map.height):
+        for y in range(game_map.height):
+            pos = Position(x, y)
+            if game_map[pos].halite_amount > constants.MAX_HALITE/meat_factor:
+                meat_points.append(pos)
+                taken.append(0)
+
+#returns nearest meat point
+def nearestMeatPoint(pos, ship_positions):
+    global taken
+
+    min_dist = 10000
+    min_pos = None
+    for p in range(len(meat_points)):
+        if meat_points[p] in ship_positions or taken[p] == 1: continue
+
+        dist = abs(meat_points[p].x - pos.x) + abs(meat_points[p].y - pos.y)
+        logging.info(dist)
+        if(dist < min_dist):
+            min_dist = dist
+            min_pos = p
+
+    taken[p] = 1
+    return meat_points[min_pos]
 
 #maps ship id to their designated destination
 ship_dests = {} 
@@ -66,6 +92,8 @@ while True:
     #stores current and next positions of ships, so that other ships can avoid these stops(even turtles need personal space!)
     ship_positions = []
 
+    taken = [0 for i in range(len(meat_points))]
+
     #storing initial positions of ships
     for ship in me.get_ships():
         ship_positions.append(ship.position)
@@ -75,9 +103,11 @@ while True:
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
         #   Else, collect halite.
 
+        logging.info("WOOOOOOOOO" + str(len(meat_points)))
+
         #if the ship id doesn't exist in ship_dests or the ship is at the shipyard, give his life a meaning
         if ship.id not in ship_dests.keys() or ship.position == me.shipyard.position:
-            ship_dests[ship.id] = meat_points[random.randint(0, len(meat_points)-1)]
+            ship_dests[ship.id] = nearestMeatPoint(ship.position, ship_positions)
 
         ship_positions.append(ship.position)
 
@@ -100,10 +130,10 @@ while True:
         #else if the ship's cell if almost clear
         elif game_map[ship.position].halite_amount < constants.MAX_HALITE/10:
             #if ship is at its destination((possibly former) meat point), remove it from meat points as it is exhausted
+            if ship.position in meat_points:
+                meat_points.remove(ship.position)
             if ship.position == ship_dests[ship.id]:
-                if ship.position in meat_points:
-                    meat_points.remove(ship.position)
-                ship_dests[ship.id] = meat_points[random.randint(0, len(meat_points)-1)]
+                ship_dests[ship.id] = nearestMeatPoint(ship.position, ship_positions)
                 
             #the next 10-ish lines of code make sure that the ship doesn't collide with any other step, and updates ship_positions
             next_move = game_map.naive_navigate(ship, ship_dests[ship.id])
@@ -120,6 +150,11 @@ while True:
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
     if game.turn_number <= 200 and me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied:
         command_queue.append(me.shipyard.spawn())
+
+    #if we're running out of meat points, reduce standards
+    if len(meat_points) <= len(me.get_ships()):
+        meat_factor *= 2
+        getMeatPoints()
 
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)
