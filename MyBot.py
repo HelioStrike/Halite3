@@ -85,6 +85,8 @@ while True:
     me = game.me
     game_map = game.game_map
 
+    logging.info("Meat factor " + str(meat_factor))
+
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
     command_queue = []
@@ -102,8 +104,6 @@ while True:
     for ship in me.get_ships():
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
         #   Else, collect halite.
-
-        logging.info("WOOOOOOOOO" + str(len(meat_points)))
 
         #if the ship id doesn't exist in ship_dests or the ship is at the shipyard, give his life a meaning
         if ship.id not in ship_dests.keys() or ship.position == me.shipyard.position:
@@ -128,13 +128,15 @@ while True:
             ship_positions.append(ship.position.addDirection(next_move))
             command_queue.append(ship.move(next_move))
         #else if the ship's cell if almost clear
-        elif game_map[ship.position].halite_amount < constants.MAX_HALITE/10:
+        elif game_map[ship.position].halite_amount < constants.MAX_HALITE/max(10, meat_factor):
             #if ship is at its destination((possibly former) meat point), remove it from meat points as it is exhausted
             if ship.position in meat_points:
                 meat_points.remove(ship.position)
             if ship.position == ship_dests[ship.id]:
                 ship_dests[ship.id] = nearestMeatPoint(ship.position, ship_positions)
-                
+            if game_map[ship_dests[ship.id]].halite_amount < constants.MAX_HALITE/meat_factor:
+                ship_dests[ship.id] = nearestMeatPoint(ship.position, ship_positions)
+
             #the next 10-ish lines of code make sure that the ship doesn't collide with any other step, and updates ship_positions
             next_move = game_map.naive_navigate(ship, ship_dests[ship.id])
             if next_move == Direction.Still or ship.position.addDirection(next_move) in ship_positions:
@@ -152,7 +154,7 @@ while True:
         command_queue.append(me.shipyard.spawn())
 
     #if we're running out of meat points, reduce standards
-    if len(meat_points) <= len(me.get_ships()):
+    if len(meat_points) <= len(me.get_ships()) + 1:
         meat_factor *= 2
         getMeatPoints()
 
